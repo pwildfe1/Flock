@@ -28,10 +28,10 @@ class myBoid:
         return self.pos
 
 class myFlock:
-    def __init__(self,positions,vectors,THRES,FACTOR):
+    def __init__(self,positions,vectors):
         self.boids = []
-        self.range = THRES
-        self.factor = FACTOR
+        self.range = 5
+        self.factor = .15
         for i in range(len(positions)):
             self.boids.append(myBoid(positions[i],vectors[i],self.range,positions))
     def separate(self):
@@ -55,63 +55,39 @@ class myFlock:
             if len(index)>0:
                 avg = sum/len(index)
                 self.boids[i].vec = rs.PointAdd(self.boids[i].vec,avg)
-    def getCnt(self):
+    def cohesion(self):
         sum=[0,0,0]
         for i in range(len(self.boids)):
             sum = rs.PointAdd(sum,self.boids[i].pos)
         center = sum/len(self.boids)
-        return center
-    def cohesion(self,guideCrv):
-        center = self.getCnt()
-        param = rs.CurveClosestPoint(guideCrv,center)
-        center = rs.EvaluateCurve(guideCrv,param)
         for i in range(len(self.boids)):
             avg = rs.VectorCreate(center,self.boids[i].pos)*self.factor
             self.boids[i].vec = rs.PointAdd(self.boids[i].vec,avg)
-    def bias(self,guideCrv,factor):
-        center = self.getCnt()
-        param = rs.CurveClosestPoint(guideCrv,center)
-        tan = rs.CurveTangent(guideCrv,param)
-        for i in range(len(self.boids)):
-            param = rs.CurveClosestPoint(guideCrv,self.boids[i].pos)
-            pt = rs.EvaluateCurve(guideCrv,param)
-            vector = rs.VectorCreate(pt,self.boids[i].pos)
-            self.boids[i].vec = rs.PointAdd(self.boids[i].vec,vector*factor)
-            #self.boids[i].vec = rs.PointAdd(self.boids[i].vec,vector*factor)
-
-def genRandomSign():
-    sign = 1
-    factor = r.random()
-    if factor>.5:
-        sign = -sign
-    return sign
 
 def genRandom(x,y,z):
-    x=r.random()*x*genRandomSign()
-    y=r.random()*y*genRandomSign()
-    z=r.random()*z*genRandomSign()
+    x=r.random()*x
+    y=r.random()*y
+    z=r.random()*z
     return rs.PointAdd([0,0,0],[x,y,z])
 
 def Main():
-    guide = rs.GetObject("please select guide curve",rs.filter.curve)
-    thres = rs.GetReal("please enter range of boid",10)
-    factor = rs.GetReal("please enter factor of cohesion",.5)
-    bias = rs.GetReal("please enter factor of bias",.05)
-    num=30
+    num=10
     time=20
     pos=[]
     vec=[]
-    for i in range(30):
-        pos.append(rs.PointAdd(rs.CurveStartPoint(guide),genRandom(10,10,10)))
-        param = rs.CurveParameter(guide,0)
-        vec.append(rs.CurveTangent(guide,param))
-    flock = myFlock(pos,vec,thres,factor)
+    for i in range(int(num/2)):
+        position = genRandom(10,10,10)
+        vector = genRandom(1,1,1)
+        pos.append(position)
+        pos.append([-position[0],-position[1],position[2]])
+        vec.append(vector)
+        vec.append(vector)
+    flock = myFlock(pos,vec)
     for i in range(time):
         for j in range(len(flock.boids)):
             position=flock.boids[j].trace()
         flock.separate()
         flock.align()
-        flock.cohesion(guide)
-        #flock.bias(guide,bias)
+        flock.cohesion()
 
 Main()

@@ -3,12 +3,13 @@ import math as m
 import random as r
 
 class myBoid:
-    def __init__(self,pos,vec,range,boids):
+    def __init__(self,pos,vec,range,boids,CURVE):
         self.pos = pos
         self.vec = vec
         self.pt = rs.AddPoint(pos)
         self.range = range
         self.flock = boids
+        self.guide = CURVE
     def findClosest(self):
         indexes = []
         for i in range(len(self.flock)):
@@ -20,20 +21,34 @@ class myBoid:
         start = self.pos
         dir=[1,0,0]
         self.vec=rs.VectorUnitize(self.vec)*self.range
-        self.vec=rs.PointAdd(self.vec,dir)
         self.pt = rs.MoveObject(self.pt,self.vec)
         self.pos = rs.PointAdd(self.pos,self.vec)
-        if self.pos!=start:
-            trace = rs.AddLine(start,self.pos)
+        #if self.pos!=start:
+        #    trace = rs.AddLine(start,self.pos)
         return self.pos
+    def mirror(self):
+        param = rs.CurveClosestPoint(self.guide,self.pos)
+        tan = rs.CurveTangent(self.guide,param)
+        crvPt = rs.EvaluateCurve(self.guide,param)
+        vector = rs.VectorCreate(self.pos,crvPt)
+        axis = rs.VectorCrossProduct(tan,vector)
+        mirorVec = rs.VectorRotate(vector,180,axis)
+        mirrorStart = rs.PointAdd(self.pos,mirorVec*2)
+        vec = rs.VectorRotate(self.vec,180,axis)
+        vec = rs.VectorUnitize(vec)*self.range
+        mirrorPos = rs.PointAdd(mirrorStart,vec)
+        if mirrorStart!=mirrorPos:
+            mirrorTrace = rs.AddLine(mirrorStart,mirrorPos)
+        return mirrorPos
 
 class myFlock:
-    def __init__(self,positions,vectors,THRES,FACTOR):
+    def __init__(self,positions,vectors,THRES,FACTOR,CURVE):
         self.boids = []
         self.range = THRES
         self.factor = FACTOR
+        self.guide = CURVE
         for i in range(len(positions)):
-            self.boids.append(myBoid(positions[i],vectors[i],self.range,positions))
+            self.boids.append(myBoid(positions[i],vectors[i],self.range,positions,self.guide))
     def separate(self):
         sum=[0,0,0]
         for i in range(len(self.boids)):
@@ -61,23 +76,14 @@ class myFlock:
             sum = rs.PointAdd(sum,self.boids[i].pos)
         center = sum/len(self.boids)
         return center
-    def cohesion(self,guideCrv):
+    def cohesion(self):
         center = self.getCnt()
-        param = rs.CurveClosestPoint(guideCrv,center)
-        center = rs.EvaluateCurve(guideCrv,param)
+        param = rs.CurveClosestPoint(self.guide,center)
+        center = rs.EvaluateCurve(self.guide,param)
         for i in range(len(self.boids)):
             avg = rs.VectorCreate(center,self.boids[i].pos)*self.factor
             self.boids[i].vec = rs.PointAdd(self.boids[i].vec,avg)
-    def bias(self,guideCrv,factor):
-        center = self.getCnt()
-        param = rs.CurveClosestPoint(guideCrv,center)
-        tan = rs.CurveTangent(guideCrv,param)
-        for i in range(len(self.boids)):
-            param = rs.CurveClosestPoint(guideCrv,self.boids[i].pos)
-            pt = rs.EvaluateCurve(guideCrv,param)
-            vector = rs.VectorCreate(pt,self.boids[i].pos)
-            self.boids[i].vec = rs.PointAdd(self.boids[i].vec,vector*factor)
-            #self.boids[i].vec = rs.PointAdd(self.boids[i].vec,vector*factor)
+        return rs.CurveNormalizedParameter(self.guide,param)
 
 def genRandomSign():
     sign = 1
@@ -96,22 +102,37 @@ def Main():
     guide = rs.GetObject("please select guide curve",rs.filter.curve)
     thres = rs.GetReal("please enter range of boid",10)
     factor = rs.GetReal("please enter factor of cohesion",.5)
-    bias = rs.GetReal("please enter factor of bias",.05)
-    num=30
-    time=20
+    radius = rs.GetReal("please enter radius of starting",6)
+    positions = []
+    crvPts = []
+    curves = []
     pos=[]
     vec=[]
-    for i in range(30):
-        pos.append(rs.PointAdd(rs.CurveStartPoint(guide),genRandom(10,10,10)))
+    num=5
+    time=50
+    progress = 0
+    norm = rs.CurveTangent(guide,rs.CurveClosestPoint(guide,rs.CurveStartPoint(guide)))
+    plane = rs.PlaneFromNormal(rs.CurveStartPoint(guide),norm)
+    circle = rs.AddCircle(plane,6)
+    startPos = rs.DivideCurve(circle,num)
+    for i in range(num):
+        position = startPos[i]
+        pos.append(position)
         param = rs.CurveParameter(guide,0)
         vec.append(rs.CurveTangent(guide,param))
-    flock = myFlock(pos,vec,thres,factor)
+        crvPts.append([position])
+    flock = myFlock(pos,vec,thres,factor,guide)
     for i in range(time):
-        for j in range(len(flock.boids)):
-            position=flock.boids[j].trace()
-        flock.separate()
-        flock.align()
-        flock.cohesion(guide)
-        #flock.bias(guide,bias)
+        if(progress!=1):
+            for j in range(len(flock.boids)):
+                positions.append(flock.boids[j].trace())
+            for j in range(len(positions)):
+                crvPts[j].append(positions[j])
+            positions = []
+            flock.separate()
+            flock.align()
+            progress = flock.cohesion()
+    for i in range(len(crvPts)):
+        curves.append(rs.AddCurve(crvPts[i],1))
 
 Main()
