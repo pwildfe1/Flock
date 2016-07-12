@@ -104,7 +104,7 @@ def Main():
     progress = 0
     norm = rs.CurveTangent(guide,rs.CurveClosestPoint(guide,rs.CurveStartPoint(guide)))
     plane = rs.PlaneFromNormal(rs.CurveStartPoint(guide),norm)
-    circle = rs.AddEllipse(plane,radius/2,radius)
+    circle = rs.AddEllipse(plane,radius,radius)
     startPos = rs.DivideCurve(circle,num)
     for i in range(num):
         position = startPos[i]
