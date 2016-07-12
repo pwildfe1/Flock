@@ -37,8 +37,9 @@ class myBoid:
         vec = rs.VectorRotate(self.vec,180,axis)
         vec = rs.VectorUnitize(vec)*self.range
         mirrorPos = rs.PointAdd(mirrorStart,vec)
-        if mirrorStart!=mirrorPos:
-            mirrorTrace = rs.AddLine(mirrorStart,mirrorPos)
+        print len(mirrorPos)
+        #if mirrorStart!=mirrorPos:
+        #    mirrorTrace = rs.AddLine(mirrorStart,mirrorPos)
         return mirrorPos
 
 class myFlock:
@@ -85,35 +86,25 @@ class myFlock:
             self.boids[i].vec = rs.PointAdd(self.boids[i].vec,avg)
         return rs.CurveNormalizedParameter(self.guide,param)
 
-def genRandomSign():
-    sign = 1
-    factor = r.random()
-    if factor>.5:
-        sign = -sign
-    return sign
-
-def genRandom(x,y,z):
-    x=r.random()*x*genRandomSign()
-    y=r.random()*y*genRandomSign()
-    z=r.random()*z*genRandomSign()
-    return rs.PointAdd([0,0,0],[x,y,z])
 
 def Main():
     guide = rs.GetObject("please select guide curve",rs.filter.curve)
-    thres = rs.GetReal("please enter range of boid",10)
-    factor = rs.GetReal("please enter factor of cohesion",.5)
-    radius = rs.GetReal("please enter radius of starting",6)
+    thres = rs.GetReal("please enter range of boid",100)
+    factor = rs.GetReal("please enter factor of cohesion",1.1)
+    radius = rs.GetReal("please enter radius of starting",50)
     positions = []
+    mirrorPos = []
     crvPts = []
+    mirrorPts = []
     curves = []
     pos=[]
     vec=[]
-    num=5
-    time=50
+    num=20
+    time=300
     progress = 0
     norm = rs.CurveTangent(guide,rs.CurveClosestPoint(guide,rs.CurveStartPoint(guide)))
     plane = rs.PlaneFromNormal(rs.CurveStartPoint(guide),norm)
-    circle = rs.AddCircle(plane,6)
+    circle = rs.AddEllipse(plane,radius/2,radius)
     startPos = rs.DivideCurve(circle,num)
     for i in range(num):
         position = startPos[i]
@@ -121,18 +112,23 @@ def Main():
         param = rs.CurveParameter(guide,0)
         vec.append(rs.CurveTangent(guide,param))
         crvPts.append([position])
+        mirrorPts.append([0,0,0])
     flock = myFlock(pos,vec,thres,factor,guide)
     for i in range(time):
         if(progress!=1):
             for j in range(len(flock.boids)):
+                mirrorPos.append(flock.boids[j].mirror())
                 positions.append(flock.boids[j].trace())
-            for j in range(len(positions)):
+            for j in range(len(flock.boids)):
                 crvPts[j].append(positions[j])
+                mirrorPts[j].append(mirrorPos[j])
             positions = []
+            mirrorPos = []
             flock.separate()
             flock.align()
             progress = flock.cohesion()
     for i in range(len(crvPts)):
         curves.append(rs.AddCurve(crvPts[i],1))
+        curves.append(rs.AddCurve(mirrorPts[i],1))
 
 Main()
